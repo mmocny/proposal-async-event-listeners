@@ -23,7 +23,7 @@ function observeClicks() {
 function addPassiveEventListener(target, type, callback, opts) {
     target.addEventListener(type, async (...args) => {
         await new Promise(resolve => requestAnimationFrame(resolve));
-        await scheduler.yield();
+        await new Promise(resolve => setTimeout(resolve, 0)); // Note: scheduler.yield() better
         callback(...args);
     }, opts);
 }
