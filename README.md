@@ -11,7 +11,7 @@ Building web applications requires dealing with inherantly asynchronous operatio
 This causes developers to reach for complex solutions, many of which are re-invented and repeated.  Let's discuss some of these issues:
 
 1. Lack of support for `passive` Event Listeners.
-2. Trouble flushing post-processing work before "document unload".
+2. Risks of deferring work due to "document unload".
 3. Desire to track "async effects" which follow event dispatch.
 4. Document loading: page has painted, but isn’t ready to receive input yet.
 5. Lazy listeners and progressive hydration: Target isn’t ready to receive input, yet.
@@ -55,7 +55,7 @@ One [improvement suggested beyond this is to add support for `{ priority }`](htt
 Passive observation is the default for some events already (such as [Popover API Events' `beforetoggle` vs `toggle`](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API#events)).  Features like Intersection Observer or some animation lifetime events.  Beyond adding support for passive for all UIEvents, there might other examples of non-passive events / callbacks / observers across the platform.
 
 
-## 2. Trouble flushing yieldy tasks before "document unload".
+## 2. Risks of deferring work due to "document unload".
 
 Today, because you can you can attach blocking event listeners (e.g. before every link click), you can easily **block the start of a navigation**, and prevent the unloading of the current document, by preventing the loading of a new document.
 
