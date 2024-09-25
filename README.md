@@ -6,7 +6,10 @@
 
 ## Introduction
 
-Building web applications requires dealing with inherantly asynchronous operations, and increasingly so.  As web developers, we have a lot of great tools for this -- but Event Listeners are still inherantly synchronous -- and the task scheduling policies for event dispatch is particularly tricky.  This causes a range of issues which can require complex solutions, many of which are re-invented or repeated.
+Building web applications requires dealing with inherantly asynchronous operations, and increasingly so.  But Event dispatch and Event Listeners is still inherantly synchronous. 
+ Scheduling of event dispatch is even trickier.
+
+This causes a range of issues which can require complex solutions, many of which are re-invented and repeated.
 
 Let's discuss some of these issues:
 
@@ -19,36 +22,40 @@ Let's discuss some of these issues:
 
 ## 1. Lack of support for `passive` Event Listeners.
 
-When some action happens on the web platform that results in firing events, **all event listeners** for that event are **immediately dispatched**, right then & there on the spot, without regard to the priority of the listener relative to surrounding tasks.
+When some action happens on the web platform that results in firing events, **all event listeners** for that event are **immediately dispatched**.
 
 - [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1a-non-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1a-non-passive-listeners.html)
 
-It's entirely possible that developers wish to know about/respond to some events at a much lower priority than other competing tasks at around the same time. Currently there is no way to signal to the platform, that an event listener should be invoked asynchronously after the platform would ordinarily do so, saving the event listener's invocation for a less-busy/contentious time, in terms of task scheduling and execution.
+Developers often wish to respond to some events at a much lower priority, without blocking other work such as next paint.  Currently, there is no way to signal this to the platform.
 
-Web performance advocates have been trying to teach developers to split up necessary work:
+Web performance advocates have been trying to teach [patterns like `await afterNextPaint()`](https://web.dev/articles/optimize-inp#yield_to_allow_rendering_work_to_occur_sooner):
 
-- work inherantly required to implement the default action correctly, and
-- provide necessary visual feedback to the user, from
-- any follow-on work that can be deferred.
-- I.e. via [patterns like `await afterNextPaint()`](https://web.dev/articles/optimize-inp#yield_to_allow_rendering_work_to_occur_sooner)
+- Synchronously, do work inherantly required to implement the default action.
+- Schedule follow-on work that can be deferred.
+- Yield.
 
-[]`addEventListener` already supports the option for `{ passive: true }`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#passive), but currently a few events related to scrolling actually dispatch passively.
+But, many event listeners do not have **any** work needed to implement the default action.
+
+
+#### `{ passive: true }`
+
+[]`addEventListener` already supports the option for `{ passive: true }`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#passive), but currently only a few events related to scrolling actually dispatch passively.
 
 - [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1b-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1b-passive-listeners.html)
 - [See polyfilled example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1c-polyfill-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1c-polyfill-passive-listeners.html)
 - [See alternative polyfilled example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1d-better-polyfill-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1d-better-polyfill-passive-listeners.html)
 
+Note: "passive" events **do not* expect support for `preventDefault`.
+
+Note: this is easy to polyfill or workaround, but, that makes it less accessible and actually less used in practice.  Native support might have performance opportunities, especially if all registered event listeners are passive.  As a native feature, it might also be possible for the browser to implement restrictions or interventions: e.g. perhaps a specific `<script>` could be contrained to only support passive listeners.
+
+#### `{ priority: 'background' }`
+
 One [improvement suggested beyond this is to add support for `{ priority }`](https://github.com/whatwg/dom/issues/1308), which implies "passive" or "async" but gives more control about the relative importance of this listner.
 
-Passive observation is the default for some events already (such as [Popover API Events' `beforetoggle` vs `toggle`](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API#events)).  Features like Intersection Observer or some animation lifetime events.  Beyond adding support for passive for all UIEvents, there might other examples of non-passive events / callbacks / observers across the platform.
+#### Other details
 
-Properties:
-- "passive" events do not expect support for `preventDefault`.
-- Easy to polyfill or workaround, but, that makes it less accessible and less used.
-- Polyfill might leave scheduling/performance opportunities on the table, especially if all registered event listeners are passive.
-- Interop risks? it seems the fallback is just to existing behaviour...
-- As a native feature, might be applied as a policy / intervention.
-  - For example, constraining a third party script to only be allowed to register passive listeners.
+Passive observation is the default for some events already (such as [Popover API Events' `beforetoggle` vs `toggle`](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API#events)).  Features like Intersection Observer or some animation lifetime events.  Beyond adding support for passive for all UIEvents, there might other examples of non-passive events / callbacks / observers across the platform.
 
 
 ## 2. Trouble flushing yieldy tasks before "document unload".
