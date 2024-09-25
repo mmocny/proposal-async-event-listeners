@@ -5,12 +5,12 @@
 
 ## Introduction
 
-Building web applications requires dealing with inherantly asynchronous operations, and increasingly so.  We have a lot of great tools for dealing with these -- but Event Listeners on the web are still inherantly synchronous.  This causes a range of issues which can require complex solutions, many of which are re-invented or repeated.
+Building web applications requires dealing with inherantly asynchronous operations, and increasingly so.  As web developers, we have a lot of great tools for this -- but Event Listeners are still inherantly synchronous -- and the task scheduling policies for event dispatch is particularly tricky.  This causes a range of issues which can require complex solutions, many of which are re-invented or repeated.
 
 Let's discuss some of these issues:
 
 1. Lack of support for `passive` Event Listeners.
-2. Trouble flushing yieldy tasks before "document unload".
+2. Trouble flushing post-processing work before "document unload".
 3. Desire to track "async effects" which follow event dispatch.
 4. Document loading: page has painted, but isn’t ready to receive input yet.
 5. Lazy listeners and progressive hydration: Target isn’t ready to receive input, yet.
