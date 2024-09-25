@@ -34,6 +34,8 @@ Web performance advocates have been trying to teach [patterns like `await afterN
 
 But, many event listeners do not have **any** work needed to implement the default action.
 
+Example: [Issues with Cookie consent buttons](https://web.dev/articles/cookie-notice-best-practices#inp-impact) (Read thos [Case Study](https://web.dev/case-studies/pubconsent-inp) that saw a 64% perf improvement).
+
 
 #### Idea: `{ passive: true }`
 
