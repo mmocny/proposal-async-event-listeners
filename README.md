@@ -1,17 +1,14 @@
 # proposal-async-event-listeners
 
-- Related [proposal in whatwg/dom/issues/1308](https://github.com/whatwg/dom/issues/1308)
+- Related to: [proposal in whatwg/dom/issues/1308](https://github.com/whatwg/dom/issues/1308)
 - [TPAC 2024 Breakout session](https://www.w3.org/events/meetings/df616a60-8591-4f24-b305-aa0870aac1cb/)
 - [Examples](./examples/)
 
 ## Introduction
 
-Building web applications requires dealing with inherantly asynchronous operations, and increasingly so.  But Event dispatch and Event Listeners is still inherantly synchronous. 
- Scheduling of event dispatch is even trickier.
+Building web applications requires dealing with inherantly asynchronous operations, but Event dispatch and Event Listeners are still inherantly synchronous.  Scheduling for event dispatch is even trickier.
 
-This causes a range of issues which can require complex solutions, many of which are re-invented and repeated.
-
-Let's discuss some of these issues:
+This causes developers to reach for complex solutions, many of which are re-invented and repeated.  Let's discuss some of these issues:
 
 1. Lack of support for `passive` Event Listeners.
 2. Trouble flushing post-processing work before "document unload".
