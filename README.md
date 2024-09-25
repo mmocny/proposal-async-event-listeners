@@ -151,39 +151,43 @@ Question: What about HitTesting and LayoutShifts?  Should we capture the target 
 
 ## 5. Lazy listeners and progressive hydration: Target isn’t ready to receive input, yet.
 
-Similar to (4) but expended through the full lifetime of the page.
+Similar to (4), but expended through the full lifetime of the page and on a per-component level.
 
-A common mantra we hear often is: web developers are **shipping too much JavaScript** and slowing down the page.
+A common mantra we hear often is: web developers are **shipping too much JavaScript** and slowing down the page.  A mostly static component of the page, which offers some interaction functionality, but users rarely interact with it, should not need to be "initialized" until the user chooses to use it.
 
-But the current design of event listevers really motivates preloading and preregistering the full implementation for every possible feature on the page, or, building complex machinery for **event capture + replay**, often with synthetic event dispatch at the framework level.
+But the current design of event listevers motivates preloading and preregistering the full implementation for every possible feature on the page, or, building complex machinery for **event capture & replay**.
+
 
 #### Idea: Capture events and replay when ready
 
-An increasingly common pattern is actually incredibly powerful:
-- create tiny bundles of functionality for specific components (or even specific events)
-- server render the initial, often static UI, and lazily preload the bundle
-- when the user interacts, capture the event, and switch to prioritized loading of the bundle
-  - similar to `idleUntilUrgent` pattern.
-  - might even try to predict an interaction will come soon, (like speculation rules)
-- then, replay the event.
+The following is already a common pattern and is incredibly powerful:
+- create tiny bundles of functionality for your page
+  - Perhaps on component/ui boundaries or even for every specific event listener
+- server render the page, without any requirement for script to run on client to render
+- start to preload important bundle(s) with low-ish priority, based on predicted usage behaviour
+  - Similar to speculation rules?
+- when the user does interact switch to prioritized loading
+  - similar to `idleUntilUrgent` pattern?
+- Then, dispatch (or replay) the event.
 
 
-This is complex, but generally great for users.  However, the UA does not have insights into this and several web platform features break:
+This is complex, but generally great for users.  However, now the UA does not have insights into the "real" event listener.  Several web platform features break:
 
 - `preventDefault` can get called pre-emptively
 - [Transient User Activation](https://developer.mozilla.org/en-US/docs/Glossary/Transient_activation)
 - Event Timing measurement of responsiveness
-- etc..
+- Accessibility features
+- ...anything else?
 
 
-Ideas:
+Perhaps native event listeners should be able to support this use case.
+
+Strawman:
 - Allow `addEventListeners` to support promises
   - `event.waitUntil` (service worker extendable events)
   - `event.intercept({ async handler() {} })` (navigation api)
   - `return promise` (ViewTransitions)
-- After HitTest, but before event dispatch, confirm that events are registered.
-  - Strawman: `addEventListenerInitializer`
-- Let browser co-ordinate loading:
-  - onclick
+- Allow browser to lazy load listeners:
+  - `loading=lazy` +
+  - `blocking=interactions` per element +
   - `onclick="URL"`
-
