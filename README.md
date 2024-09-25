@@ -2,6 +2,7 @@
 
 - Related proposal: https://github.com/whatwg/dom/issues/1308
 - [TPAC 2024 Breakout session](https://www.w3.org/events/meetings/df616a60-8591-4f24-b305-aa0870aac1cb/)
+- [Examples](./examples/)
 
 ## Introduction
 
@@ -20,12 +21,24 @@ Let's discuss some of these issues:
 
 When some action happens on the web platform that results in firing events, **all event listeners** for that event are **immediately dispatched**, right then & there on the spot, without regard to the priority of the listener relative to surrounding tasks.
 
+- [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1a-non-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1a-non-passive-listeners.html)
+
 It's entirely possible that developers wish to know about/respond to some events at a much lower priority than other competing tasks at around the same time. Currently there is no way to signal to the platform, that an event listener should be invoked asynchronously after the platform would ordinarily do so, saving the event listener's invocation for a less-busy/contentious time, in terms of task scheduling and execution.
 
+Now, `addEventListener(type, callback, { passive: true })` already exists, but currently only supported for various `touch`/`scroll` events.
+
+- [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1b-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1b-passive-listeners.html)
+- [See polyfilled example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1c-polyfill-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1c-polyfill-passive-listeners.html)
+- [See alternative polyfilled example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1d-better-polyfill-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1d-better-polyfill-passive-listeners.html)
+
+
+Properties:
 - This event listener needs to observe the event, but doesn't actually implement the core functionality of the event and doesn't need to be scheduled immediately and before next paint.
-- Already supported for various scroll events, and for specific features like Intersection Observer and some animation lifetime events, etc.
-- Easy to polyfill or workaround, as an opt-in, but might leave scheduling/performance opportunities on the table.
-- As a native feature, might be applied as a policy / intervention. For example, constraining a third party script to only be allowed to register passive listeners.
+- passive observation is the default for features like Intersection Observer or some animation lifetime events.
+- Easy to polyfill or workaround, but becomes less accessible less used.
+- Polyfill might leave scheduling/performance opportunities on the table, especially if all registered event listeners are passive.
+- As a native feature, might be applied as a policy / intervention.
+  - For example, constraining a third party script to only be allowed to register passive listeners.
 - Note: {priority} seems to me to imply "passive" yet gives even more control.
 
 ## 2. Trouble flushing yieldy tasks before "document unload".
