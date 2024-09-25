@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+
+<input id="button" type="button" value="Click Me!"></input>
+<div id="counter">0</div>
+
+<script>
+
+function updateCount() {
+    counter.textContent = +counter.textContent + 1;
+}
+
+button.addEventListener('click', (event) => updateCount());
+
+</script>
+
+<script>
+
+function observeClicks() {
+    const deadline = performance.now() + 1000;
+    while (performance.now() < deadline); // super important
+}
+
+function addPassiveEventListener(target, type, callback, opts) {
+    target.addEventListener(type, (...args) => {
+        scheduler.postTask(() => callback(...args));
+    }, opts);
+}
+
+addPassiveEventListener(document, 'click', observeClicks);
+
+</script>
