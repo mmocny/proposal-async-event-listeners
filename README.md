@@ -68,18 +68,35 @@ Scott Haseley has recently presented proposed features for `scheduler.postTask` 
 
 We might want to require an explicit signal `{ plzRunBeforeUnload: true }` so we don't prioritize tasks that ask for it.
 
+
 ## 3. Desire to track "async effects" which follow event dispatch.
 
-- AsyncContext proposal would help track the context... but when is the effect complete?
-- Might still want to be able to preventDefault etc from the async.
-  - e.g. form validation which needs a network hop first.
-  - e.g. modal dialog which requires a network hop before allowing dismissal.
-- Might want other web platform features, like performance event timing, to measure all the way to the end of async effects.
+Today it is hard to know when all the effects triggered by an event are complete.
+
+For example, some sites might have many event listeners registered accross many components, and some observer tries to wait until "all work is complete", using very complex and careful coordination.
+
+For any one discrete interaction there might be any number of unique event types that fire, each with capture/bubble phases, and then asynchronous api calls might follow.
+
+Support for `passive` events would only add to this problem -- as now, even if you could observe and coordinate everything, you wouldn't quite know when to stop observing.
+
+Some developers have asked for insights into the state of dispatch to event listeners (i.e. perhaps a count of registered + remaining).  Perhaps a single completion event would suffice. (Could that itself become a recursive problem?)
+
+There are proposals to help with effects that span across asynchonous scheduling, such as the `AsyncContext` proposal.
+
+Further: some developers have asked to be able to delay default action, and support for `preventDefault`, across async boundaries.  This seems difficult.
+
+- For example: form validation which needs a network hop first.
+- For example: modal dialog which requires a network hop before allowing dismissal.
+- For example: How long after clicking on a button does the UI update?
+  - Event Timing (and the metric INP) measure the initial latency: the very next paint, but,
+  - Nothing measures performance of async hop into future animation frames (as is common with `await fetch()`)
+
 
 ## 4. Document loading: page has painted, but isn’t ready to receive input yet.
 
 - Related to lazy-loading controllers but less fine grained. We have blocking=rendering for first paint but we don't have a way to block all events on resources like script.
 - Very early interactions are racy, and the priority of event dispatch is unpredictably prioritized over async/defer scripts.
+
 
 ## 5. Lazy listeners and progressive hydration: Target isn’t ready to receive input, yet.
 
