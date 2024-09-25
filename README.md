@@ -1,6 +1,6 @@
 # proposal-async-event-listeners
 
-- Related proposal: https://github.com/whatwg/dom/issues/1308
+- Related [proposal in whatwg/dom/issues/1308](https://github.com/whatwg/dom/issues/1308)
 - [TPAC 2024 Breakout session](https://www.w3.org/events/meetings/df616a60-8591-4f24-b305-aa0870aac1cb/)
 - [Examples](./examples/)
 
@@ -94,8 +94,22 @@ Further: some developers have asked to be able to delay default action, and supp
 
 ## 4. Document loading: page has painted, but isn’t ready to receive input yet.
 
-- Related to lazy-loading controllers but less fine grained. We have blocking=rendering for first paint but we don't have a way to block all events on resources like script.
-- Very early interactions are racy, and the priority of event dispatch is unpredictably prioritized over async/defer scripts.
+We have `blocking=rendering` for first paint, but we don't have a way to `blocking=interactions`.
+
+It is very common for sites to render the content of the page before executing any script that registers necessary event listeners.  Registering event listeners after `DOMContentLoaded` fires is common.  Registering listeners from `<script defer>` or `<script type=module>` is implicitly running after `DOMContentLoaded`.
+
+On more sophisticated sites, especailly those that use frameworks which might require lots of bootstrapping, the gap can be so large that some developers have invented special mechanisms to capture very early interactions:
+
+- inlining javascript in the html
+- semantic attributes on nodes, together with event capture + replay
+  -  `on:click="..."`, `jsaction="click:..."`, `onClick$="..."`
+- clever (ab)use of `<Form>`
+
+Many developers observe that interactions very early with the page, even while it is busy loading, can appear to perform better than interactions that come later-- because they interaction might still do nothing at all and appear broken to the user.
+
+Worse: the registration of event listeners and dispatch of events is very racy.  The priority of event dispatch is higher than script execution -- even if the script is loaded and ready to run.
+
+When the even loop is full of tasks that need running, we don't know how long to wait before dispatching events.
 
 
 ## 5. Lazy listeners and progressive hydration: Target isn’t ready to receive input, yet.
