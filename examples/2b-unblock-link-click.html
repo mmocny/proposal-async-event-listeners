@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+
+<a href="https://www.w3.org/events/meetings/df616a60-8591-4f24-b305-aa0870aac1cb/">TPAC Breakout session</a>
+<p>
+    Last time this page unloaded, we ran for: <span id="log"></span>ms.
+</p>
+
+<script>
+
+log.innerText = localStorage.getItem('lastValue');
+
+async function observeClicks() {
+    const start = performance.now();
+    while (true) { // super important
+        await new Promise(resolve => setTimeout(resolve), 0);
+        localStorage.setItem('lastValue', performance.now() - start);
+    } // super important
+}
+
+
+function addPassiveEventListener(target, type, callback, opts) {
+    target.addEventListener(type, async (...args) => {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        await new Promise(resolve => setTimeout(resolve, 0)); // Note: scheduler.yield() better
+        callback(...args);
+    }, opts);
+}
+
+addPassiveEventListener(document, 'click', observeClicks);
+
+// Try to disable bfcache because freezing/resuming breaks the demo.
+window.addEventListener('unload', () => {});
+
+</script>

@@ -25,27 +25,48 @@ When some action happens on the web platform that results in firing events, **al
 
 It's entirely possible that developers wish to know about/respond to some events at a much lower priority than other competing tasks at around the same time. Currently there is no way to signal to the platform, that an event listener should be invoked asynchronously after the platform would ordinarily do so, saving the event listener's invocation for a less-busy/contentious time, in terms of task scheduling and execution.
 
-Now, `addEventListener(type, callback, { passive: true })` already exists, but currently only supported for various `touch`/`scroll` events.
+`addEventListener(type, callback, { passive: true })` already exists, but currently only supported for various `touch`/`scroll` events.
 
 - [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1b-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1b-passive-listeners.html)
 - [See polyfilled example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1c-polyfill-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1c-polyfill-passive-listeners.html)
 - [See alternative polyfilled example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1d-better-polyfill-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1d-better-polyfill-passive-listeners.html)
 
+One [improvement suggested beyond this is to add support for `{ priority }`](https://github.com/whatwg/dom/issues/1308), which implies "passive" or "async" but gives more control about the relative importance of this listner.
+
+Passive observation is the default for features like Intersection Observer or some animation lifetime events.  Beyond adding support for passive for all UIEvents, there might other examples of non-passive events / callbacks / observers across the platform.
 
 Properties:
-- This event listener needs to observe the event, but doesn't actually implement the core functionality of the event and doesn't need to be scheduled immediately and before next paint.
-- passive observation is the default for features like Intersection Observer or some animation lifetime events.
-- Easy to polyfill or workaround, but becomes less accessible less used.
+- "passive" events do not expect support for `preventDefault`.
+- Easy to polyfill or workaround, but, that makes it less accessible and less used.
 - Polyfill might leave scheduling/performance opportunities on the table, especially if all registered event listeners are passive.
+- Interop risks? it seems the fallback is just to existing behaviour...
 - As a native feature, might be applied as a policy / intervention.
   - For example, constraining a third party script to only be allowed to register passive listeners.
-- Note: {priority} seems to me to imply "passive" yet gives even more control.
+
 
 ## 2. Trouble flushing yieldy tasks before "document unload".
 
-- Today you can easily block the start of a navigation that would unload a document, but, once a document starts unloading there is a limited amount of time for script.
-- As a result, many scripts hook onto events and delay the default action (such as a link navigaton or form submit) from even starting, for fear of not having a change to observe the event at all when that event triggers document unload.
-- Perhaps we need a contract: This event listener is only passively attached to this event... but it should be "flushed" before unload. (Reminder: these scripts are already blocking unload start, anyway)
+Today, because you can you can attach blocking event listeners (e.g. before every link click), you can easily **block the start of a navigation**, and prevent the unloading of the current document, by preventing the loading of a new document.
+
+- [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/2a-block-link-click.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/2a-block-link-click.html)
+
+Note: The network request does not even begin until after the event is done processing (because of preventDefault / or potential to register late `beforeUnload`).
+
+
+A well behaved script might choose to `passive`ly observe these events instead, allowing the UA to run the default actions, but, once a document starts unloading there is a limited amount of time for script to run.
+
+- [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/2b-unblock-link-click.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/2b-unblock-link-click.html)
+
+As a result, many scripts hook onto events and delay the default action (such as a link navigaton or form submit) from even starting, for fear of not having enough time to observe the event otherwise.
+
+Perhaps we can provide some assurances:
+- If you were already in the position to block unload of the page, then
+- Yielding (or passively observing) instead should not substantially change your ability to get scheduled before unload.
+
+
+Scott Haseley has recently presented proposed features for `scheduler.postTask` which might be useful here.  `postTask` and `yield` already [support "inheritance"](https://docs.google.com/document/d/1rIOBBbkLh3w79hBrJ2IrZWmo5tzkVFc0spJHPE8iP-E/edit#heading=h.c484rp62uh2i).  Could we leverage this to add a flag that these tasks **already could have** blocked unload?
+
+We might want to require an explicit signal `{ plzRunBeforeUnload: true }` so we don't prioritize tasks that ask for it.
 
 ## 3. Desire to track "async effects" which follow event dispatch.
 
