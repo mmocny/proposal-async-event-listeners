@@ -2,6 +2,7 @@
 
 - Related to: [proposal in whatwg/dom/issues/1308](https://github.com/whatwg/dom/issues/1308)
 - [TPAC 2024 Breakout session](https://www.w3.org/events/meetings/df616a60-8591-4f24-b305-aa0870aac1cb/)
+  - IRC channel: [https://irc.w3.org/?channels=%23async-event-listeners](https://irc.w3.org/?channels=%23async-event-listeners)
 - [Examples](./examples/)
 
 ## Introduction
@@ -34,9 +35,9 @@ Web performance advocates have been trying to teach [patterns like `await afterN
 But, many event listeners do not have **any** work needed to implement the default action.
 
 
-#### `{ passive: true }`
+#### Idea: `{ passive: true }`
 
-[]`addEventListener` already supports the option for `{ passive: true }`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#passive), but currently only a few events related to scrolling actually dispatch passively.
+`addEventListener` already supports the option for [`{ passive: true }`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#passive), but currently only a few events related to scrolling actually dispatch passively.
 
 - [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1b-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1b-passive-listeners.html)
 - [See polyfilled example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/1c-polyfill-passive-listeners.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/1c-polyfill-passive-listeners.html)
@@ -46,90 +47,106 @@ Note: "passive" events **do not* expect support for `preventDefault`.
 
 Note: this is easy to polyfill or workaround, but, that makes it less accessible and actually less used in practice.  Native support might have performance opportunities, especially if all registered event listeners are passive.  As a native feature, it might also be possible for the browser to implement restrictions or interventions: e.g. perhaps a specific `<script>` could be contrained to only support passive listeners.
 
-#### `{ priority: 'background' }`
+#### Idea: `{ priority: 'background' }`
 
 One [improvement suggested beyond this is to add support for `{ priority }`](https://github.com/whatwg/dom/issues/1308), which implies "passive" or "async" but gives more control about the relative importance of this listner.
 
 #### Other details
 
-Passive observation is the default for some events already (such as [Popover API Events' `beforetoggle` vs `toggle`](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API#events)).  Features like Intersection Observer or some animation lifetime events.  Beyond adding support for passive for all UIEvents, there might other examples of non-passive events / callbacks / observers across the platform.
+- Passive observation is the default for some events already:
+  - such as [Popover API events `beforetoggle` vs `toggle`](https://developer.mozilla.org/en-US/docs/Web/API/Popover_API#events).
+  - certain animation lifetime events
+  - possible many others...
+- Beyond UIEvents?  Other APIs with events / callbacks?
+  - IntersectionObserver / PerformanceObserver designed to be inherantly async
 
 
 ## 2. Risks of deferring work due to "document unload".
 
-Today, because you can you can attach blocking event listeners (e.g. before every link click), you can easily **block the start of a navigation**, and prevent the unloading of the current document, by preventing the loading of a new document.
+Today, because you can you can attach blocking event listeners (e.g. before every link click), you can easily **block the start of a navigation**, and prevent the unloading of the current document.
 
 - [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/2a-block-link-click.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/2a-block-link-click.html)
 
 Note: The network request does not even begin until after the event is done processing (because of preventDefault / or potential to register late `beforeUnload`).
 
-
-A well behaved script might choose to `passive`ly observe these events instead, allowing the UA to run the default actions, but, once a document starts unloading there is a limited amount of time for script to run.
+A nice script might choose to `yield` or `passive`-ly observe these events instead.  But now, once a document starts unloading there is a very limited amount of time for tasks to get scheduled and execute.
 
 - [See example](https://github.com/mmocny/proposal-async-event-listeners/blob/main/examples/2b-unblock-link-click.html) or [Try it](https://mmocny.com/proposal-async-event-listeners/examples/2b-unblock-link-click.html)
 
 As a result, many scripts hook onto events and delay the default action (such as a link navigaton or form submit) from even starting, for fear of not having enough time to observe the event otherwise.
 
-Perhaps we can provide some assurances:
+#### Idea: add "assurances" for flushing before unload
+
 - If a task could block unload of the page, then
-- Yielding -- or passively observing events -- should not substantially decrease the odds of being scheduled.
-- Should not need to block the new document from loading in.
-- We already allow the event loop to run for some time after navigation to next document.
-  - We just don't prioritize, or factor in any signals.
-  - There are differences between same origin and cross origin navigation...
-- Background: [`idleUntilUrgent()` pattern](https://philipwalton.com/articles/idle-until-urgent/)
+- Yielding -- or passively observing events -- should be "flagged" as supporing flushing before unload, and
+- Without blocking new document navigation start, or the current document unload.
 
+Background: [`idleUntilUrgent()` pattern](https://philipwalton.com/articles/idle-until-urgent/) polyfills this idea using document lifecycle events.
 
-Scott Haseley has recently presented proposed features for `scheduler.postTask` which might be useful here.  `postTask` and `yield` already [support "inheritance"](https://docs.google.com/document/d/1rIOBBbkLh3w79hBrJ2IrZWmo5tzkVFc0spJHPE8iP-E/edit#heading=h.c484rp62uh2i).  Could we leverage this to add a flag that these tasks **already could have** blocked unload?
+Scott Haseley has recently presented proposed features for `scheduler.postTask` to address the broader use case.  Scheduler `postTask` and `yield` already [support "inheritance"](https://docs.google.com/document/d/1rIOBBbkLh3w79hBrJ2IrZWmo5tzkVFc0spJHPE8iP-E/edit#heading=h.c484rp62uh2i).
 
-We might want to require an explicit signal `{ plzRunBeforeUnload: true }` so we don't prioritize tasks that ask for it.
+- Could we inherit another flag that these tasks **could have blocked unload**?
+- Would we want an explicit signal `{ plzRunBeforeUnload: true }`?
 
 
 ## 3. Desire to track "async effects" which follow event dispatch.
 
-Today it is hard to know when all the effects triggered by an event are complete.
+Today it is hard to know when all the effects triggered by an interaction are complete.
 
-For example, some sites might have many event listeners registered accross many components, and some observer tries to wait until "all work is complete", using very complex and careful coordination.
+Some sites create mechanisms to observe when "all work is complete", often requiring very complex instrumentation and careful coordination (wrapping browser apis, creating "zones", requiring build tooling, etc).
 
-For any one discrete interaction there might be any number of unique event types that fire, each with capture/bubble phases, and then asynchronous api calls might follow.
+Support for `passive` events would only add to this problem, because instead of "one action, many effects" you almsot have "many actions".
 
-Support for `passive` events would only add to this problem -- as now, even if you could observe and coordinate everything, you wouldn't quite know when to stop observing.
+#### Idea: track completion of all effects
 
-Some developers have asked for insights into the state of dispatch to event listeners (i.e. perhaps a count of registered + remaining).  Perhaps a single completion event would suffice. (Could that itself become a recursive problem?)
+Some developers have asked for insights into the state of dispatch to event listeners (have all listeners run to completion?).
 
-There are proposals to help with effects that span across asynchonous scheduling, such as the `AsyncContext` proposal.
+There is also active work to track scheduled tasks back to an initiating Interaction.  i.e. Task attribution and the `AsyncContext` proposal.  Perhaps you might be able to observe tasks remaining (i.e. in TaskController) or when the last task has finished running (i.e. [FinalizationRegistry](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/FinalizationRegistry)).
 
-Further: some developers have asked to be able to delay default action, and support for `preventDefault`, across async boundaries.  This seems difficult.
+#### Stretch goal: async support for preventDefault
 
-For example:
-- Some libraries will "debounce" ALL events, always.  The "real" listener is wrapped and delayed.
-- form validation which needs a network hop first.
-- modal dialog which requires a network hop before allowing dismissal.
-- How long after clicking on a button does the UI update?
-  - Event Timing (and the metric INP) measure the initial latency: the very next paint, but,
-  - Nothing measures performance of async hop into future animation frames (as is common with `await fetch()`)
+Some developers have asked to be able to delay default action, and extend support for `preventDefault`, across async boundaries.  This seems difficult.
+
+#### Use cases
+
+- Some libraries will "debounce" **all events, always**.
+  - The "real" listener is wrapped and delayed, even if just one animation frame.
+  - The "real" listener might still be a single synchronous task.
+- Form validation: which needs a network hop to decide.
+- Modal dialog: several components might need to coordinate before allowing dismissal.
+- Performance: How long after clicking on a button does the UI actually update?
+  - Event Timing (and the metric INP) only measures the initial latency of the very next paint
+  - Super common for events to `await fetch()` before updating page.
 
 
 ## 4. Document loading: page has painted, but isn’t ready to receive input yet.
 
 We have `blocking=rendering` for first paint, but we don't have a way to `blocking=interactions`.
 
-It is very common for sites to render the content of the page before executing any script that registers necessary event listeners.  Registering event listeners after `DOMContentLoaded` fires is common.  Registering listeners from `<script defer>` or `<script type=module>` is implicitly running after `DOMContentLoaded`.
+It is very recommended that sites server render the content of a page and allow client to start painting content, without depending on script.  Therefore, commonly early renderings are for pages without registered event listeners.
 
-On more sophisticated sites, especailly those that use frameworks which might require lots of bootstrapping, the gap can be so large that some developers have invented special mechanisms to capture very early interactions:
+Waiting until after `DOMContentLoaded` fires is common.  Registering listeners from `<script defer>` or `<script type=module>` is implicitly running after `DOMContentLoaded`.
 
+Many developers have reported that interactions very early with the page can appear to perform better than interactions that come later (counterintuitive)-- and found that this is because the interaction is worse than slow: it does nothing, and appears broken to the user.
+
+Some workarounds have been:
 - inlining javascript in the html
 - semantic attributes on nodes, together with event capture + replay
   -  `on:click="..."`, `jsaction="click:..."`, `onClick$="..."`
 - clever (ab)use of `<Form>`
-  - It's great that actions work "without JavaScript" but the fallback experience can be worse
-  - and, silly to fallback when the script is already fetched and just waiting to run... might be much slower submit form.
+  - It's great that actions work "without JavaScript", but
+  - The fallback is to sumit a form and reload the page.  Slow.
+  - Silly to do this especially if the script is already fetched and just waiting to execute.
 
-Many developers observe that interactions very early with the page, even while it is busy loading, can appear to perform better than interactions that come later-- because the interaction might still do nothing at all and appear broken to the user.
+#### Idea: Delay event dispatch, perhaps by decreasing task priority
 
-Worse: the registration of event listeners and dispatch of events is very racy.  The priority of event dispatch is higher than script execution -- even if the script is loaded and ready to run.
+Execution of script that registers event listeners, and the dispatch of events is already very racy.  Events already take time to arrive in browser, renderer process, etc, so there is already an existing lack of ordering guarentees.
 
-When the even loop is full of tasks that need running, we don't know how long to wait before dispatching events.  Today we don't wait at all.
+Today, we don't know how long to wait before dispatching events, or which tasks to prioritize above event dispatch.
+
+Today, we just don't wait for the page to settle at all.
+
+Question: What about HitTesting and LayoutShifts?  Should we capture the target immediately?
 
 
 ## 5. Lazy listeners and progressive hydration: Target isn’t ready to receive input, yet.
@@ -139,6 +156,8 @@ Similar to (4) but expended through the full lifetime of the page.
 A common mantra we hear often is: web developers are **shipping too much JavaScript** and slowing down the page.
 
 But the current design of event listevers really motivates preloading and preregistering the full implementation for every possible feature on the page, or, building complex machinery for **event capture + replay**, often with synthetic event dispatch at the framework level.
+
+#### Idea: Capture events and replay when ready
 
 An increasingly common pattern is actually incredibly powerful:
 - create tiny bundles of functionality for specific components (or even specific events)
