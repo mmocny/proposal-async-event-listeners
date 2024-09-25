@@ -22,7 +22,8 @@ function observeClicks() {
 
 function addPassiveEventListener(target, type, callback, opts) {
     target.addEventListener(type, (...args) => {
-        scheduler.postTask(() => callback(...args));
+        // scheduler.postTask, with support for priority, is better
+        setTimeout(() => callback(...args), 0);
     }, opts);
 }
 
